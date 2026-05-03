@@ -20,8 +20,9 @@
 #include "main.h"
 #include "mcp25625.h"
 #include "protocol.h"
-#include <math.h>
 #include <string.h>
+#include <math.h>
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -99,262 +100,268 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-
+  MX_IWDG_Init();
   MX_SPI1_Init();
   MX_TIM1_Init();
   MX_TIM3_Init();
-  MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
-  CanFrame frame = {0};
+
 
   // starting up the timers for the pwm for each motor
+  CanFrame frame = {0};
+
+  start_motors();
 
 
-start_motors();
 
-
-// mcu startup
-
-MCP_attach(&hspi1,CS_GPIO_Port, CS_Pin );
-if (!MCP_init()) {
-	Error_Handler();
-}
-
-
+  MCP_attach(&hspi1, CS_GPIO_Port, CS_Pin);
+  if (!MCP_init()) {
+      Error_Handler();
+  }
 
   /* USER CODE END 2 */
 
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
+  while (1)   {
 
+      HAL_IWDG_Refresh(&hiwdg);
+      HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_SET);
 
-while (1)
- {
-     HAL_IWDG_Refresh(&hiwdg);
-     HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_SET);
+      if (MCP_receive_frame(&frame))
+      {
+          uint8_t device_id   = (frame.id >> 1)  & 0x3F;
+          uint8_t instruction = (frame.id >> 7)  & 0xFF;
+          uint8_t severity    = (frame.id >> 15) & 0x03;
 
-     if (MCP_receive_frame(&frame))
-     {
-         if (frame.id == FORCE_STOP_ID) {
+          if (device_id == BOARD_DEVICE_ID && severity == ctrl_id_type)
+          {
+              if (instruction == force_stop_id_bit) {
+                  stop_motors();
 
-             stop_motors();
+                  CanFrame hb_frame = {0};
+                  hb_frame.id  = MAKE_ID(status_id_type, error_id_bit);
+                  hb_frame.dlc = 4;
+                  hb_frame.data[0] = 'E';
+                  hb_frame.data[1] = '0';
+                  hb_frame.data[2] = '7';
+                  hb_frame.data[3] = '0';
 
-             CanFrame hb_frame = {0};
-             hb_frame.id = HEARTBEAT_ID;
-             hb_frame.dlc = 4;
-             hb_frame.data[0] = 'E';
-             hb_frame.data[1] = '0';
-             hb_frame.data[2] = '7';
-             hb_frame.data[3] = '0';
+                  while (1) {
+                      HAL_IWDG_Refresh(&hiwdg);
+                      MCP_send_frame(&hb_frame);
+                      HAL_Delay(100);
 
-             while (1) {
-                 HAL_IWDG_Refresh(&hiwdg);
-                 MCP_send_frame(&hb_frame);
-                 HAL_Delay(100);
-                 CanFrame rx = {0};
-                        if (MCP_receive_frame(&rx)) {
-                            if (rx.id == RESUME_ID) {
-                            	start_motors();
-                                break;
-                            }
-                        }
-                    }
+                      CanFrame rx = {0};
+                      if (MCP_receive_frame(&rx)) {
+                          uint8_t rx_dev = (rx.id >> 1)  & 0x3F;
+                          uint8_t rx_ins = (rx.id >> 7)  & 0xFF;
+                          uint8_t rx_sev = (rx.id >> 15) & 0x03;
+                          if (rx_dev == BOARD_DEVICE_ID
+                              && rx_sev == ctrl_id_type
+                              && rx_ins == resume_id_bit) {
+                              start_motors();
+                              break;
+                          }
+                      }
+                  }
+              }
+              else if (instruction == resume_id_bit) {
+                  start_motors();
+              }
+              else if (instruction == motor_1_id_bit) {
+                  float rads;
+                  memcpy(&rads, &frame.data[0], 4);
+                  uint16_t duty = (fabsf(rads) / MAX_RADS) * 999;
+                  if (duty > 999) duty = 999;
+                  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, duty);
+                  HAL_GPIO_WritePin(GPIOB, M1_DIR_Pin,
+                      rads >= 0.0f ? GPIO_PIN_SET : GPIO_PIN_RESET);
+              }
+              else if (instruction == motor_2_id_bit) {
+                  float rads;
+                  memcpy(&rads, &frame.data[0], 4);
+                  uint16_t duty = (fabsf(rads) / MAX_RADS) * 999;
+                  if (duty > 999) duty = 999;
+                  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, duty);
+                  HAL_GPIO_WritePin(GPIOB, M2_DIR_Pin,
+                      rads >= 0.0f ? GPIO_PIN_SET : GPIO_PIN_RESET);
+              }
+              else if (instruction == motor_3_id_bit) {
+                  float rads;
+                  memcpy(&rads, &frame.data[0], 4);
+                  uint16_t duty = (fabsf(rads) / MAX_RADS) * 999;
+                  if (duty > 999) duty = 999;
+                  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, duty);
+                  HAL_GPIO_WritePin(GPIOB, M3_DIR_Pin,
+                      rads >= 0.0f ? GPIO_PIN_SET : GPIO_PIN_RESET);
+              }
+              else if (instruction == motor_4_id_bit) {
+                  float rads;
+                  memcpy(&rads, &frame.data[0], 4);
+                  uint16_t duty = (fabsf(rads) / MAX_RADS) * 999;
+                  if (duty > 999) duty = 999;
+                  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, duty);
+                  HAL_GPIO_WritePin(GPIOB, M4_DIR_Pin,
+                      rads >= 0.0f ? GPIO_PIN_SET : GPIO_PIN_RESET);
+              }
+              else if (instruction == motor_5_id_bit) {
+                  float rads;
+                  memcpy(&rads, &frame.data[0], 4);
+                  uint16_t duty = (fabsf(rads) / MAX_RADS) * 999;
+                  if (duty > 999) duty = 999;
+                  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, duty);
+                  HAL_GPIO_WritePin(GPIOB, M5_DIR_Pin,
+                      rads >= 0.0f ? GPIO_PIN_SET : GPIO_PIN_RESET);
+              }
+              else if (instruction == led_id_bit) {
+                  if (frame.data[0] == 0x01) {
+                      HAL_GPIO_WritePin(GPIOB, RUN_LED_Pin, GPIO_PIN_RESET);
+                  } else {
+                      HAL_GPIO_WritePin(GPIOB, RUN_LED_Pin, GPIO_PIN_SET);
+                  }
+              }
+          }
+      }
 
+      uint8_t eflg = MCP_read_eflg();
 
-         }
-         else if (frame.id == RESUME_ID)
-         {
-        	 start_motors();
-         }
-         else if (frame.id == MOTOR_1_ID)
-         {
-             float rads;
-             memcpy(&rads, &frame.data[0], 4);
-             uint8_t direction = frame.data[4];
-             uint16_t duty = (fabsf(rads) / MAX_RADS) * 999;
-             if (duty > 999) duty = 999;
-             __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, duty);
-             if (direction == 1)
-                 HAL_GPIO_WritePin(GPIOB, M1_DIR_Pin, GPIO_PIN_SET);
-             else
-                 HAL_GPIO_WritePin(GPIOB, M1_DIR_Pin, GPIO_PIN_RESET);
-         }
-         else if (frame.id == MOTOR_2_ID)
-         {
-             float rads;
-             memcpy(&rads, &frame.data[0], 4);
-             uint8_t direction = frame.data[4];
-             uint16_t duty = (fabsf(rads) / MAX_RADS) * 999;
-             if (duty > 999) duty = 999;
-             __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, duty);
-             if (direction == 1)
-                 HAL_GPIO_WritePin(GPIOB, M2_DIR_Pin, GPIO_PIN_SET);
-             else
-                 HAL_GPIO_WritePin(GPIOB, M2_DIR_Pin, GPIO_PIN_RESET);
-         }
-         else if (frame.id == MOTOR_3_ID)
-         {
-             float rads;
-             memcpy(&rads, &frame.data[0], 4);
-             uint8_t direction = frame.data[4];
-             uint16_t duty = (fabsf(rads) / MAX_RADS) * 999;
-             if (duty > 999) duty = 999;
-             __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, duty);
-             if (direction == 1)
-                 HAL_GPIO_WritePin(GPIOB, M3_DIR_Pin, GPIO_PIN_SET);
-             else
-                 HAL_GPIO_WritePin(GPIOB, M3_DIR_Pin, GPIO_PIN_RESET);
-         }
-         else if (frame.id == MOTOR_4_ID)
-         {
-             float rads;
-             memcpy(&rads, &frame.data[0], 4);
-             uint8_t direction = frame.data[4];
-             uint16_t duty = (fabsf(rads) / MAX_RADS) * 999;
-             if (duty > 999) duty = 999;
-             __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, duty);
-             if (direction == 1)
-                 HAL_GPIO_WritePin(GPIOB, M4_DIR_Pin, GPIO_PIN_SET);
-             else
-                 HAL_GPIO_WritePin(GPIOB, M4_DIR_Pin, GPIO_PIN_RESET);
-         }
-         else if (frame.id == MOTOR_5_ID)
-         {
-             float rads;
-             memcpy(&rads, &frame.data[0], 4);
-             uint8_t direction = frame.data[4];
-             uint16_t duty = (fabsf(rads) / MAX_RADS) * 999;
-             if (duty > 999) duty = 999;
-             __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, duty);
-             if (direction == 1)
-                 HAL_GPIO_WritePin(GPIOB, M5_DIR_Pin, GPIO_PIN_SET);
-             else
-                 HAL_GPIO_WritePin(GPIOB, M5_DIR_Pin, GPIO_PIN_RESET);
-         }
-     }
+      if (eflg & (MCP_EFLG_RX1OVR | MCP_EFLG_RX0OVR)) {
+          MCP_clear_rx_overflow();
 
-     uint8_t eflg = MCP_read_eflg();
+          CanFrame warning_frame = {0};
+          warning_frame.id  = MAKE_ID(status_id_type, error_id_bit);
+          warning_frame.dlc = 4;
+          warning_frame.data[0] = 'W';
+          warning_frame.data[1] = '0';
+          warning_frame.data[2] = '0';
+          warning_frame.data[3] = '1';
 
-     if (eflg & (MCP_EFLG_RX1OVR | MCP_EFLG_RX0OVR)) {
-         MCP_clear_rx_overflow();
+          while (1) {
+              HAL_IWDG_Refresh(&hiwdg);
+              MCP_send_frame(&warning_frame);
+              HAL_Delay(100);
 
-         CanFrame warning_frame = {0};
-         warning_frame.id = WARNING_ID;
-         warning_frame.dlc = 4;
-         warning_frame.data[0] = 'W';
-         warning_frame.data[1] = '0';
-         warning_frame.data[2] = '0';
-         warning_frame.data[3] = '1';
+              CanFrame rx = {0};
+              if (MCP_receive_frame(&rx)) {
+                  uint8_t rx_dev = (rx.id >> 1)  & 0x3F;
+                  uint8_t rx_ins = (rx.id >> 7)  & 0xFF;
+                  uint8_t rx_sev = (rx.id >> 15) & 0x03;
+                  if (rx_dev == BOARD_DEVICE_ID
+                      && rx_sev == ctrl_id_type
+                      && rx_ins == resume_id_bit) {
+                      break;
+                  }
+              }
+          }
+      }
 
-         while (1) {
-             HAL_IWDG_Refresh(&hiwdg);
-             MCP_send_frame(&warning_frame);
-             HAL_Delay(100);
+      if (eflg & MCP_EFLG_TXBO) {
+          stop_motors();
+          HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_RESET);
 
-             CanFrame rx = {0};
-             if (MCP_receive_frame(&rx)) {
-                 if (rx.id == RESUME_ID)
-                     break;
-             }
-         }
-     }
+          CanFrame error_frame = {0};
+          error_frame.id  = MAKE_ID(status_id_type, error_id_bit);
+          error_frame.dlc = 4;
+          error_frame.data[0] = 'E';
+          error_frame.data[1] = 'B';
+          error_frame.data[2] = 'O';
+          error_frame.data[3] = 'F';
 
-     if (eflg & MCP_EFLG_TXBO ) {
-         stop_motors();
-         HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_RESET);
+          while (1) {
+              HAL_IWDG_Refresh(&hiwdg);
+              MCP_send_frame(&error_frame);
+              HAL_Delay(100);
 
-         CanFrame error_frame = {0};
-         error_frame.id = ERROR_ID;
-         error_frame.dlc = 4;
-         error_frame.data[0] = 'E';
-         error_frame.data[1] = 'B';
-         error_frame.data[2] = 'O';
-         error_frame.data[3] = 'F';
+              CanFrame rx = {0};
+              if (MCP_receive_frame(&rx)) {
+                  uint8_t rx_dev = (rx.id >> 1)  & 0x3F;
+                  uint8_t rx_ins = (rx.id >> 7)  & 0xFF;
+                  uint8_t rx_sev = (rx.id >> 15) & 0x03;
+                  if (rx_dev == BOARD_DEVICE_ID
+                      && rx_sev == ctrl_id_type
+                      && rx_ins == resume_id_bit) {
+                      MCP_recover_bus();
+                      start_motors();
+                      HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_SET);
+                      break;
+                  }
+              }
+          }
+      }
+      else if (eflg & MCP_EFLG_TXEP) {
+          stop_motors();
 
-         while (1) {
-             HAL_IWDG_Refresh(&hiwdg);
-             MCP_send_frame(&error_frame);
-             HAL_Delay(100);
+          CanFrame error_frame = {0};
+          error_frame.id  = MAKE_ID(status_id_type, error_id_bit);
+          error_frame.dlc = 4;
+          error_frame.data[0] = 'E';
+          error_frame.data[1] = 'T';
+          error_frame.data[2] = 'X';
+          error_frame.data[3] = 'P';
 
-             CanFrame rx = {0};
-             if (MCP_receive_frame(&rx)) {
-                 if (rx.id == RESUME_ID) {
-                     MCP_recover_bus();
-                     start_motors();
-                     HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_SET);
-                     break;
-                 }
-             }
-         }
-     }
-     else if (eflg & MCP_EFLG_TXEP ) {
-    	 stop_motors();
+          while (1) {
+              HAL_IWDG_Refresh(&hiwdg);
+              MCP_send_frame(&error_frame);
+              HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_RESET);
+              HAL_Delay(1000);
+              HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_SET);
+              HAL_Delay(1000);
 
-    	          CanFrame error_frame = {0};
-    	          error_frame.id = ERROR_ID;
-    	          error_frame.dlc = 4;
-    	          error_frame.data[0] = 'E';
-    	          error_frame.data[1] = 'T';
-    	          error_frame.data[2] = 'X';
-    	          error_frame.data[3] = 'P';
+              CanFrame rx = {0};
+              if (MCP_receive_frame(&rx)) {
+                  uint8_t rx_dev = (rx.id >> 1)  & 0x3F;
+                  uint8_t rx_ins = (rx.id >> 7)  & 0xFF;
+                  uint8_t rx_sev = (rx.id >> 15) & 0x03;
+                  if (rx_dev == BOARD_DEVICE_ID
+                      && rx_sev == ctrl_id_type
+                      && rx_ins == resume_id_bit) {
+                      MCP_recover_bus();
+                      start_motors();
+                      HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_SET);
+                      break;
+                  }
+              }
+          }
+      }
+      else if (eflg & MCP_EFLG_RXEP) {
+          stop_motors();
 
-    	          while (1) {
-    	              HAL_IWDG_Refresh(&hiwdg);
-    	              MCP_send_frame(&error_frame);
-    	              HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_RESET);
-    	              HAL_Delay(1000);
-    	              HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_SET);
-    	              HAL_Delay(1000);
+          CanFrame error_frame = {0};
+          error_frame.id  = MAKE_ID(status_id_type, error_id_bit);
+          error_frame.dlc = 4;
+          error_frame.data[0] = 'E';
+          error_frame.data[1] = 'R';
+          error_frame.data[2] = 'X';
+          error_frame.data[3] = 'P';
 
-    	              CanFrame rx = {0};
-    	              if (MCP_receive_frame(&rx)) {
-    	                  if (rx.id == RESUME_ID) {
-    	                      MCP_recover_bus();
-    	                      start_motors();
-    	                      HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_SET);
-    	                      break;
-    	                  }
-    	              }
-    	          }
+          while (1) {
+              HAL_IWDG_Refresh(&hiwdg);
+              MCP_send_frame(&error_frame);
+              HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_RESET);
+              HAL_Delay(500);
+              HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_SET);
+              HAL_Delay(500);
 
-     }
-     else if (eflg & MCP_EFLG_RXEP) {
-    	 stop_motors();
-
-    	    	          CanFrame error_frame = {0};
-    	    	          error_frame.id = ERROR_ID;
-    	    	          error_frame.dlc = 4;
-    	    	          error_frame.data[0] = 'E';
-    	    	          error_frame.data[1] = 'R';
-    	    	          error_frame.data[2] = 'X';
-    	    	          error_frame.data[3] = 'P';
-
-    	    	          while (1) {
-    	    	              HAL_IWDG_Refresh(&hiwdg);
-    	    	              MCP_send_frame(&error_frame);
-    	    	              HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_RESET);
-    	    	              HAL_Delay(500);
-    	    	              HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_SET);
-    	    	              HAL_Delay(500);
-
-    	    	              CanFrame rx = {0};
-    	    	              if (MCP_receive_frame(&rx)) {
-    	    	                  if (rx.id == RESUME_ID) {
-    	    	                      MCP_recover_bus();
-    	    	                      start_motors();
-    	    	                      HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_SET);
-    	    	                      break;
-    	    	                  }
-    	    	              }
-    	    	          }
-     }
-
- }
-}
-
-
-
-
+              CanFrame rx = {0};
+              if (MCP_receive_frame(&rx)) {
+                  uint8_t rx_dev = (rx.id >> 1)  & 0x3F;
+                  uint8_t rx_ins = (rx.id >> 7)  & 0xFF;
+                  uint8_t rx_sev = (rx.id >> 15) & 0x03;
+                  if (rx_dev == BOARD_DEVICE_ID
+                      && rx_sev == ctrl_id_type
+                      && rx_ins == resume_id_bit) {
+                      MCP_recover_bus();
+                      start_motors();
+                      HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_SET);
+                      break;
+                  }
+              }
+          }
+      }
+  }
   /* USER CODE END 3 */
-
+}
 
 /**
   * @brief System Clock Configuration
@@ -372,15 +379,12 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE;
-  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI;
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.HSIDiv = RCC_HSI_DIV1;
+  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.LSIState = RCC_LSI_ON;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLM = RCC_PLLM_DIV1;
-  RCC_OscInitStruct.PLL.PLLN = 8;
-  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
-  RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -390,18 +394,14 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
   {
     Error_Handler();
   }
-
-  /** Enables the Clock Security System
-  */
-  HAL_RCC_EnableCSS();
 }
 
 /**
@@ -494,9 +494,9 @@ static void MX_TIM1_Init(void)
 
   /* USER CODE END TIM1_Init 1 */
   htim1.Instance = TIM1;
-  htim1.Init.Prescaler = 63;
+  htim1.Init.Prescaler = 1;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 999;
+  htim1.Init.Period = 799;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -587,9 +587,9 @@ static void MX_TIM3_Init(void)
 
   /* USER CODE END TIM3_Init 1 */
   htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 63;
+  htim3.Init.Prescaler = 1;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 999;
+  htim3.Init.Period = 799;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim3) != HAL_OK)

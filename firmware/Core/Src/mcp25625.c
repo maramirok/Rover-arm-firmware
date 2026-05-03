@@ -200,8 +200,11 @@ bool MCP_init(void) {
 	}
 	
 	MCP_write_byte(MCP_CNF1, 0x00);
-	MCP_write_byte(MCP_CNF2, 0x9E);
-	MCP_write_byte(MCP_CNF3, 0x03);
+	MCP_write_byte(MCP_CNF2, 0xB1);
+	MCP_write_byte(MCP_CNF3, 0x05);
+
+	MCP_write_byte(MCP_RXB0CTRL, 0x60);
+		MCP_write_byte(MCP_RXB1CTRL, 0x60);
 	
 	MCP_bit_modify(MCP_CANCTRL, 0xE0, 0x00);
 	
@@ -416,13 +419,13 @@ static void mcp_pack_ext_id_29(uint32_t id, uint8_t raw[13])
 
 static uint32_t mcp_unpack_ext_id_29(const uint8_t raw[13])
 {
-    uint32_t id = 0;
-    id |= ((uint32_t)raw[0]) << 21;
-    id |= ((uint32_t)((raw[1] >> 5) & 0x07)) << 18;
-    id |= ((uint32_t)(raw[1] & 0x03)) << 16;
-    id |= ((uint32_t)raw[2]) << 8;
-    id |= ((uint32_t)raw[3]) << 0;
-    return id & 0x1FFFFFFF;
+	uint32_t id = 0;
+	    id |= ((uint32_t)raw[0]) << 21;
+	    id |= ((uint32_t)((raw[1] >> 5) & 0x07)) << 18;
+	    id |= ((uint32_t)(raw[1] & 0x03)) << 16;
+	    id |= ((uint32_t)raw[2]) << 8;
+	    id |= ((uint32_t)raw[3]) << 0;
+	    return id;
 }
 
 static void mcp_pack_frame_to_raw(const CanFrame *f, uint8_t raw[13])

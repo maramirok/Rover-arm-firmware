@@ -86,7 +86,6 @@
 #define MCP_RXB0CTRL	0x60
 #define MCP_RXB1CTRL    0x70
 #define MCP_RXB0SIDH	0x61
-#define MCP_RXB1CTRL	0x70
 #define MCP_RXB1SIDH	0x71
 
 
@@ -167,9 +166,9 @@
 #define MCP_RXB0CTRL_RXM1 (1U<< 6)
 #define MCP_RXB0CTRL_RXM0 (1U<< 5)
 #define MCP_RXB0CTRL_RXRTR (1U<< 3)
-#define MCP_RXB0CTRL_BUKT (1U<< 2)
-#define MCP_RXB0CTRL_BUKT1 (1U<< 1)
-#define MCP_RXB0CTRL_FILHIT0 (1U<< 0)
+#define MCP_RXB0CTRL_BUKT     (1U << 2)   // rollover enable
+#define MCP_RXB0CTRL_FILHIT1  (1U << 1)   // filter hit bit 1
+#define MCP_RXB0CTRL_FILHIT0  (1U << 0)   // filter hit bit 0
 
 #define MCP_RXB1CTRL_RXM1 (1U<< 6)
 #define MCP_RXB1CTRL_RXM0 (1U<< 5)

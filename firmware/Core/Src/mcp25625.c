@@ -302,7 +302,7 @@ bool MCP_message_available(void) {
 
 
 
-MMCP_RxStatus MCP_receive_raw(uint8_t *rx_buffer_0, uint8_t *rx_buffer_1)
+MCP_RxStatus MCP_receive_raw(uint8_t *rx_buffer_0, uint8_t *rx_buffer_1)
 {
     uint8_t canintf = MCP_read_byte(MCP_CANINTF);
 

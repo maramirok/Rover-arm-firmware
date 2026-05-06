@@ -7,6 +7,7 @@
 
 
 #define BOARD_DEVICE_ID  0b000110
+#define JETSON_ID        0b000001
 
 // Severity values
 #define MEI_id_type      0b00
@@ -29,6 +30,12 @@
 #define MAX_RADS 1024.0f
 
 // ID composition
+
+#define JETSON_MAKE_ID(severity, instruction) \
+    ( ((uint32_t)(severity)     << 15) \
+    | ((uint32_t)(instruction)  <<  7) \
+    | ((uint32_t)JETSON_ID << 1) )
+
 #define MAKE_ID(severity, instruction) \
     ( ((uint32_t)(severity)     << 15) \
     | ((uint32_t)(instruction)  <<  7) \

@@ -140,7 +140,7 @@ int main(void)
                   stop_motors();
 
                   CanFrame hb_frame = {0};
-                  hb_frame.id  = MAKE_ID(status_id_type, error_id_bit);
+                  hb_frame.id  = JETSON_MAKE_ID(status_id_type, error_id_bit);
                   hb_frame.dlc = 4;
                   hb_frame.data[0] = 'E';
                   hb_frame.data[1] = '0';
@@ -177,6 +177,7 @@ int main(void)
                   __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, duty);
                   HAL_GPIO_WritePin(GPIOB, M1_DIR_Pin,
                       rads >= 0.0f ? GPIO_PIN_SET : GPIO_PIN_RESET);
+
               }
               else if (instruction == motor_2_id_bit) {
                   float rads;
@@ -214,64 +215,30 @@ int main(void)
                   HAL_GPIO_WritePin(GPIOB, M5_DIR_Pin,
                       rads >= 0.0f ? GPIO_PIN_SET : GPIO_PIN_RESET);
               }
-              else if (instruction == led_id_bit) {
-                  if (frame.data[0] == 0x01) {
-                      HAL_GPIO_WritePin(GPIOB, RUN_LED_Pin, GPIO_PIN_RESET);
-                  } else {
-                      HAL_GPIO_WritePin(GPIOB, RUN_LED_Pin, GPIO_PIN_SET);
-                  }
-              }
+
           }
       }
 
       uint8_t eflg = MCP_read_eflg();
 
       if (eflg & (MCP_EFLG_RX1OVR | MCP_EFLG_RX0OVR)) {
+
           MCP_clear_rx_overflow();
 
-          CanFrame warning_frame = {0};
-          warning_frame.id  = MAKE_ID(status_id_type, error_id_bit);
-          warning_frame.dlc = 4;
-          warning_frame.data[0] = 'W';
-          warning_frame.data[1] = '0';
-          warning_frame.data[2] = '0';
-          warning_frame.data[3] = '1';
 
-          while (1) {
-              HAL_IWDG_Refresh(&hiwdg);
-              MCP_send_frame(&warning_frame);
-              HAL_Delay(100);
 
-              CanFrame rx = {0};
-              if (MCP_receive_frame(&rx)) {
-                  uint8_t rx_dev = (rx.id >> 1)  & 0x3F;
-                  uint8_t rx_ins = (rx.id >> 7)  & 0xFF;
-                  uint8_t rx_sev = (rx.id >> 15) & 0x03;
-                  if (rx_dev == BOARD_DEVICE_ID
-                      && rx_sev == ctrl_id_type
-                      && rx_ins == resume_id_bit) {
-                      break;
-                  }
-              }
-          }
+
       }
 
       if (eflg & MCP_EFLG_TXBO) {
           stop_motors();
           HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_RESET);
 
-          CanFrame error_frame = {0};
-          error_frame.id  = MAKE_ID(status_id_type, error_id_bit);
-          error_frame.dlc = 4;
-          error_frame.data[0] = 'E';
-          error_frame.data[1] = 'B';
-          error_frame.data[2] = 'O';
-          error_frame.data[3] = 'F';
+
 
           while (1) {
               HAL_IWDG_Refresh(&hiwdg);
-              MCP_send_frame(&error_frame);
-              HAL_Delay(100);
+
 
               CanFrame rx = {0};
               if (MCP_receive_frame(&rx)) {
@@ -289,76 +256,8 @@ int main(void)
               }
           }
       }
-      else if (eflg & MCP_EFLG_TXEP) {
-          stop_motors();
 
-          CanFrame error_frame = {0};
-          error_frame.id  = MAKE_ID(status_id_type, error_id_bit);
-          error_frame.dlc = 4;
-          error_frame.data[0] = 'E';
-          error_frame.data[1] = 'T';
-          error_frame.data[2] = 'X';
-          error_frame.data[3] = 'P';
 
-          while (1) {
-              HAL_IWDG_Refresh(&hiwdg);
-              MCP_send_frame(&error_frame);
-              HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_RESET);
-              HAL_Delay(1000);
-              HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_SET);
-              HAL_Delay(1000);
-
-              CanFrame rx = {0};
-              if (MCP_receive_frame(&rx)) {
-                  uint8_t rx_dev = (rx.id >> 1)  & 0x3F;
-                  uint8_t rx_ins = (rx.id >> 7)  & 0xFF;
-                  uint8_t rx_sev = (rx.id >> 15) & 0x03;
-                  if (rx_dev == BOARD_DEVICE_ID
-                      && rx_sev == ctrl_id_type
-                      && rx_ins == resume_id_bit) {
-                      MCP_recover_bus();
-                      start_motors();
-                      HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_SET);
-                      break;
-                  }
-              }
-          }
-      }
-      else if (eflg & MCP_EFLG_RXEP) {
-          stop_motors();
-
-          CanFrame error_frame = {0};
-          error_frame.id  = MAKE_ID(status_id_type, error_id_bit);
-          error_frame.dlc = 4;
-          error_frame.data[0] = 'E';
-          error_frame.data[1] = 'R';
-          error_frame.data[2] = 'X';
-          error_frame.data[3] = 'P';
-
-          while (1) {
-              HAL_IWDG_Refresh(&hiwdg);
-              MCP_send_frame(&error_frame);
-              HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_RESET);
-              HAL_Delay(500);
-              HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_SET);
-              HAL_Delay(500);
-
-              CanFrame rx = {0};
-              if (MCP_receive_frame(&rx)) {
-                  uint8_t rx_dev = (rx.id >> 1)  & 0x3F;
-                  uint8_t rx_ins = (rx.id >> 7)  & 0xFF;
-                  uint8_t rx_sev = (rx.id >> 15) & 0x03;
-                  if (rx_dev == BOARD_DEVICE_ID
-                      && rx_sev == ctrl_id_type
-                      && rx_ins == resume_id_bit) {
-                      MCP_recover_bus();
-                      start_motors();
-                      HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_SET);
-                      break;
-                  }
-              }
-          }
-      }
   }
   /* USER CODE END 3 */
 }

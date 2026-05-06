@@ -26,15 +26,23 @@
 #define motor_5_id_bit    0b1101
 #define led_id_bit        0b1110
 
+
+
+// manufacturerr code and device type for sending frames to jetson
+#define device_type_CODE 0b00000
+#define manufacturer_CODE 0b00001000
+
 // Max angular velocity for duty cycle scaling
 #define MAX_RADS 1024.0f
 
 // ID composition
 
 #define JETSON_MAKE_ID(severity, instruction) \
-    ( ((uint32_t)(severity)     << 15) \
-    | ((uint32_t)(instruction)  <<  7) \
-    | ((uint32_t)JETSON_ID << 1) )
+    ( ((uint32_t)(device_type_CODE)     << 24) \
+    | ((uint32_t)(manufacturer_CODE)     << 16) \
+    | ((uint32_t)(severity)     << 14) \
+    | ((uint32_t)(instruction)  <<  6) \
+    | ((uint32_t)JETSON_ID << 0) )
 
 #define MAKE_ID(severity, instruction) \
     ( ((uint32_t)(severity)     << 15) \

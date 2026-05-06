@@ -192,6 +192,14 @@ typedef struct {
 
 }CanFrame;
 
+typedef enum {
+    MCP_RX_NONE      = 0,   // no frames available
+    MCP_RX_BUF0      = 1,   // RXB0 only
+    MCP_RX_BUF1      = 2,   // RXB1 only
+    MCP_RX_BOTH      = 3,   // both buffers had frames
+    MCP_RX_ERROR     = -1   // SPI read failed
+} MCP_RxStatus;
+
 
 // MCP MODES FUNCTIONS
 bool MCP_set_config_mode(void);
@@ -220,7 +228,7 @@ bool MCP_init(void);
 void MCP_RTS( uint8_t rts_cmd);
 
 // RX/ TX FUNCTIONS
-bool MCP_receive_raw(uint8_t * rx_buffer_0, uint8_t * rx_buffer_1);
+MCP_RxStatus MCP_receive_raw(uint8_t * rx_buffer_0, uint8_t * rx_buffer_1);
 bool MCP_sending_raw(const uint8_t * tx_buffer);
 
 // error detection functions

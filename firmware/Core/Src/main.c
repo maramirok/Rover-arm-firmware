@@ -166,14 +166,14 @@ int main(void)
                       }
                   }
               }
-              else if (instruction == resume_id_bit) {
-                  start_motors();
-              }
               else if (instruction == motor_1_id_bit) {
                   float rads;
+                  if (&frame.dlc != 4 ) {
+
+                  }
                   memcpy(&rads, &frame.data[0], 4);
-                  uint16_t duty = (fabsf(rads) / MAX_RADS) * 999;
-                  if (duty > 999) duty = 999;
+                  uint16_t duty = (fabsf(rads) / MAX_RADS) * htim1.Init.Period;
+                  if (duty > htim1.Init.Period) duty = htim1.Init.Period;
                   __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, duty);
                   HAL_GPIO_WritePin(GPIOB, M1_DIR_Pin,
                       rads >= 0.0f ? GPIO_PIN_SET : GPIO_PIN_RESET);
@@ -182,8 +182,8 @@ int main(void)
               else if (instruction == motor_2_id_bit) {
                   float rads;
                   memcpy(&rads, &frame.data[0], 4);
-                  uint16_t duty = (fabsf(rads) / MAX_RADS) * 999;
-                  if (duty > 999) duty = 999;
+                  uint16_t duty = (fabsf(rads) / MAX_RADS) * htim1.Init.Period;
+                  if (duty > htim1.Init.Period) duty = htim1.Init.Period;
                   __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, duty);
                   HAL_GPIO_WritePin(GPIOB, M2_DIR_Pin,
                       rads >= 0.0f ? GPIO_PIN_SET : GPIO_PIN_RESET);
@@ -191,8 +191,8 @@ int main(void)
               else if (instruction == motor_3_id_bit) {
                   float rads;
                   memcpy(&rads, &frame.data[0], 4);
-                  uint16_t duty = (fabsf(rads) / MAX_RADS) * 999;
-                  if (duty > 999) duty = 999;
+                  uint16_t duty = (fabsf(rads) / MAX_RADS) * htim1.Init.Period;
+                  if (duty > htim1.Init.Period) duty = htim1.Init.Period;
                   __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, duty);
                   HAL_GPIO_WritePin(GPIOB, M3_DIR_Pin,
                       rads >= 0.0f ? GPIO_PIN_SET : GPIO_PIN_RESET);
@@ -200,8 +200,8 @@ int main(void)
               else if (instruction == motor_4_id_bit) {
                   float rads;
                   memcpy(&rads, &frame.data[0], 4);
-                  uint16_t duty = (fabsf(rads) / MAX_RADS) * 999;
-                  if (duty > 999) duty = 999;
+                  uint16_t duty = (fabsf(rads) / MAX_RADS) * htim1.Init.Period;
+                  if (duty > htim1.Init.Period) duty = htim1.Init.Period;
                   __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, duty);
                   HAL_GPIO_WritePin(GPIOB, M4_DIR_Pin,
                       rads >= 0.0f ? GPIO_PIN_SET : GPIO_PIN_RESET);
@@ -209,8 +209,8 @@ int main(void)
               else if (instruction == motor_5_id_bit) {
                   float rads;
                   memcpy(&rads, &frame.data[0], 4);
-                  uint16_t duty = (fabsf(rads) / MAX_RADS) * 999;
-                  if (duty > 999) duty = 999;
+                  uint16_t duty = (fabsf(rads) / MAX_RADS) * htim3.Init.Period;
+                  if (duty > htim3.Init.Period) duty = htim3.Init.Period;
                   __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, duty);
                   HAL_GPIO_WritePin(GPIOB, M5_DIR_Pin,
                       rads >= 0.0f ? GPIO_PIN_SET : GPIO_PIN_RESET);
@@ -225,36 +225,14 @@ int main(void)
 
           MCP_clear_rx_overflow();
 
-
-
+          HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_RESET);
 
       }
 
       if (eflg & MCP_EFLG_TXBO) {
-          stop_motors();
+
           HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_RESET);
 
-
-
-          while (1) {
-              HAL_IWDG_Refresh(&hiwdg);
-
-
-              CanFrame rx = {0};
-              if (MCP_receive_frame(&rx)) {
-                  uint8_t rx_dev = (rx.id >> 1)  & 0x3F;
-                  uint8_t rx_ins = (rx.id >> 7)  & 0xFF;
-                  uint8_t rx_sev = (rx.id >> 15) & 0x03;
-                  if (rx_dev == BOARD_DEVICE_ID
-                      && rx_sev == ctrl_id_type
-                      && rx_ins == resume_id_bit) {
-                      MCP_recover_bus();
-                      start_motors();
-                      HAL_GPIO_WritePin(GPIOB, PANIC_LED_Pin, GPIO_PIN_SET);
-                      break;
-                  }
-              }
-          }
       }
 
 

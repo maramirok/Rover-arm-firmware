@@ -203,7 +203,7 @@ bool MCP_init(void) {
 	MCP_write_byte(MCP_CNF2, 0xB1);
 	MCP_write_byte(MCP_CNF3, 0x05);
 
-	MCP_write_byte(MCP_RXB0CTRL, 0x60);
+	MCP_write_byte(MCP_RXB0CTRL, 0x64);
 		MCP_write_byte(MCP_RXB1CTRL, 0x60);
 	
 	MCP_bit_modify(MCP_CANCTRL, 0xE0, 0x00);
@@ -302,30 +302,33 @@ bool MCP_message_available(void) {
 
 
 
-bool MCP_receive_raw(uint8_t * rx_buffer_0, uint8_t * rx_buffer_1) {
+MMCP_RxStatus MCP_receive_raw(uint8_t *rx_buffer_0, uint8_t *rx_buffer_1)
+{
+    uint8_t canintf = MCP_read_byte(MCP_CANINTF);
 
+    bool got_rx0 = false;
+    bool got_rx1 = false;
 
+    if (canintf & MCP_CANINTF_RX0IF) {
+        if (!MCP_read_bytes(MCP_RXB0SIDH, rx_buffer_0, 13)) {
+            return MCP_RX_ERROR;
+        }
+        MCP_bit_modify(MCP_CANINTF, MCP_CANINTF_RX0IF, 0x00);
+        got_rx0 = true;
+    }
 
-		uint8_t canintf = MCP_read_byte(MCP_CANINTF);
+    if (canintf & MCP_CANINTF_RX1IF) {
+        if (!MCP_read_bytes(MCP_RXB1SIDH, rx_buffer_1, 13)) {
+            return MCP_RX_ERROR;
+        }
+        MCP_bit_modify(MCP_CANINTF, MCP_CANINTF_RX1IF, 0x00);
+        got_rx1 = true;
+    }
 
-	 if ( canintf & MCP_CANINTF_RX0IF) {
-		if( !MCP_read_bytes(MCP_RXB0SIDH, rx_buffer_0, 13)) {
-			return false;
-		}
-		 MCP_bit_modify(MCP_CANINTF, MCP_CANINTF_RX0IF, 0x00);
-
-	     return true;
-	     }
-	 if ( canintf & MCP_CANINTF_RX1IF) {
-	 	if (!MCP_read_bytes(MCP_RXB1SIDH, rx_buffer_1, 13)) {
-	 			 return false;
-	 		 }
-	 		 MCP_bit_modify(MCP_CANINTF, MCP_CANINTF_RX1IF, 0x00);
-
-	 	     return true;
-	 	     }
-
-	 return false;
+    if (got_rx0 && got_rx1) return MCP_RX_BOTH;
+    if (got_rx0)            return MCP_RX_BUF0;
+    if (got_rx1)            return MCP_RX_BUF1;
+    return MCP_RX_NONE;
 }
 
 
@@ -467,41 +470,47 @@ bool MCP_send_frame(const CanFrame *frame)
 }
 
 
+// File-scope stash — holds RXB1 frame when both buffers were filled
+static CanFrame  pending_frame;
+static bool      pending_frame_valid = false;
+
 bool MCP_receive_frame(CanFrame *frame)
 {
     if (frame == NULL) return false;
 
+    // If we stashed a frame on a previous call, return it now
+    if (pending_frame_valid) {
+        *frame = pending_frame;
+        pending_frame_valid = false;
+        return true;
+    }
+
     uint8_t raw0[13] = {0};
     uint8_t raw1[13] = {0};
 
-    if (!MCP_receive_raw(raw0, raw1)) {
-        return false;
+    MCP_RxStatus status = MCP_receive_raw(raw0, raw1);
+
+    switch (status) {
+        case MCP_RX_BUF0:
+            mcp_unpack_raw_to_frame(raw0, frame);
+            return true;
+
+        case MCP_RX_BUF1:
+            mcp_unpack_raw_to_frame(raw1, frame);
+            return true;
+
+        case MCP_RX_BOTH:
+            // Two frames. Return RXB0 now, stash RXB1 for next call.
+            mcp_unpack_raw_to_frame(raw0, frame);
+            mcp_unpack_raw_to_frame(raw1, &pending_frame);
+            pending_frame_valid = true;
+            return true;
+
+        case MCP_RX_NONE:
+        case MCP_RX_ERROR:
+        default:
+            return false;
     }
-
-
-    bool raw0_used = (raw0[0] != 0) || (raw0[1] != 0) || (raw0[4] != 0);
-    bool raw1_used = (raw1[0] != 0) || (raw1[1] != 0) || (raw1[4] != 0);
-
-    if (raw0_used && !raw1_used) {
-        mcp_unpack_raw_to_frame(raw0, frame);
-        return true;
-    }
-    if (raw1_used && !raw0_used) {
-        mcp_unpack_raw_to_frame(raw1, frame);
-        return true;
-    }
-
-
-    if (raw0_used) {
-        mcp_unpack_raw_to_frame(raw0, frame);
-        return true;
-    }
-    if (raw1_used) {
-        mcp_unpack_raw_to_frame(raw1, frame);
-        return true;
-    }
-
-    return false;
 }
 
 void MCP_recover_bus(void) {
